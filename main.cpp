@@ -11,20 +11,37 @@
 #define AES_KEY_LENGTH 32  // для AES-256
 #define AES_BLOCK_SIZE 16  // размер блока AES
 
+/**
+ * @brief Обрабатывает ошибки OpenSSL и завершает программу.
+ * 
+ * Выводит сообщения об ошибках, используя библиотеку OpenSSL, и завершает выполнение программы.
+ */
 void handleErrors() {
     ERR_print_errors_fp(stderr);
     abort();
 }
-
-// Функция для генерации ключа из пароля с использованием PBKDF2
+/**
+ * @brief Генерация ключа из пароля с использованием PBKDF2.
+ * 
+ * @param[in] password Пароль, из которого будет генерироваться ключ.
+ * @param[out] key Массив байтов для сохранения сгенерированного ключа.
+ * 
+ * Функция использует алгоритм PBKDF2 с хэш-функцией SHA-1 для генерации ключа длиной AES_KEY_LENGTH байт.
+ */
 void generateKeyFromPassword(const std::string &password, unsigned char *key) {
     const unsigned char *salt = (unsigned char *)"12345678"; // Соль для PBKDF2
     if (PKCS5_PBKDF2_HMAC_SHA1(password.c_str(), password.size(), salt, 8, 10000, AES_KEY_LENGTH, key) != 1) {
         handleErrors();
     }
 }
-
-// Чтение файла
+/**
+ * @brief Чтение содержимого файла в вектор байтов.
+ * 
+ * @param[in] filename Имя файла для чтения.
+ * @return std::vector<unsigned char> Вектор байтов, содержащий данные файла.
+ * 
+ * Функция открывает файл в бинарном режиме и считывает его содержимое в вектор байтов.
+ */
 std::vector<unsigned char> readFile(const std::string &filename) {
     std::ifstream file(filename, std::ios::binary);
     if (!file.is_open()) {
@@ -33,8 +50,14 @@ std::vector<unsigned char> readFile(const std::string &filename) {
     }
     return std::vector<unsigned char>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 }
-
-// Запись файла
+/**
+ * @brief Запись данных в файл.
+ * 
+ * @param[in] filename Имя файла для записи.
+ * @param[in] data Вектор байтов, содержащий данные для записи.
+ * 
+ * Функция открывает файл в бинарном режиме и записывает данные из вектора байтов в файл.
+ */
 void writeFile(const std::string &filename, const std::vector<unsigned char> &data) {
     std::ofstream file(filename, std::ios::binary);
     if (!file.is_open()) {
@@ -43,8 +66,17 @@ void writeFile(const std::string &filename, const std::vector<unsigned char> &da
     }
     file.write((char*)data.data(), data.size());
 }
-
-// Шифрование данных с записью IV в начало файла
+/**
+ * @brief Шифрование данных с использованием AES-256 CBC и записью IV в начало файла.
+ * 
+ * @param[in] plaintext Вектор байтов, содержащий исходные данные (plaintext).
+ * @param[in] key Массив байтов, содержащий ключ для шифрования.
+ * @param[in] iv Массив байтов, содержащий вектор инициализации (IV).
+ * @return std::vector<unsigned char> Вектор байтов, содержащий зашифрованные данные с добавленным в начало IV.
+ * 
+ * Функция шифрует данные с использованием AES-256 в режиме CBC, добавляет IV в начало зашифрованного текста
+ * и возвращает результат.
+ */
 std::vector<unsigned char> encryptDataWithIV(const std::vector<unsigned char> &plaintext, unsigned char *key, unsigned char *iv) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) handleErrors();
@@ -78,8 +110,16 @@ std::vector<unsigned char> encryptDataWithIV(const std::vector<unsigned char> &p
 
     return result;
 }
-
-// Дешифрование данных с использованием IV из начала файла
+/**
+ * @brief Расшифрование данных с использованием AES-256 CBC и извлечением IV из начала файла.
+ * 
+ * @param[in] ciphertext Вектор байтов, содержащий зашифрованные данные с IV в начале.
+ * @param[in] key Массив байтов, содержащий ключ для расшифрования.
+ * @return std::vector<unsigned char> Вектор байтов, содержащий расшифрованные данные (plaintext).
+ * 
+ * Функция извлекает IV из первых AES_BLOCK_SIZE байт зашифрованного текста, а затем использует его для 
+ * расшифрования оставшейся части данных.
+ */
 std::vector<unsigned char> decryptDataWithIV(const std::vector<unsigned char> &ciphertext, unsigned char *key) {
     unsigned char iv[AES_BLOCK_SIZE];
     std::copy(ciphertext.begin(), ciphertext.begin() + AES_BLOCK_SIZE, iv);
@@ -117,12 +157,27 @@ std::vector<unsigned char> decryptDataWithIV(const std::vector<unsigned char> &c
 
     return plaintext;
 }
-
-// Вывод использования программы
+/**
+ * @brief Выводит сообщение об использовании программы.
+ * 
+ * @param[in] program Имя программы (argv[0]).
+ * 
+ * Функция выводит инструкции по использованию программы, включая доступные опции.
+ */
 void printUsage(const char *program) {
     std::cout << "Usage: " << program << " [-e | -d] -i <inputfile> -o <outputfile> -p <password>" << std::endl;
 }
-
+/**
+ * @brief Точка входа в программу.
+ * 
+ * Основная функция программы, которая обрабатывает аргументы командной строки,
+ * генерирует ключ на основе пароля, читает данные из файла, выполняет шифрование
+ * или расшифрование и сохраняет результат в файл.
+ * 
+ * @param argc Количество аргументов командной строки.
+ * @param argv Массив аргументов командной строки.
+ * @return int Возвращает 0 при успешном выполнении программы, иначе 1.
+ */
 int main(int argc, char *argv[]) {
     int opt;
     std::string inputFile, outputFile, password;
@@ -183,7 +238,7 @@ int main(int argc, char *argv[]) {
         // Шифрование данных с записью IV
         resultData = encryptDataWithIV(fileData, key, iv);
     } else if (decrypt) {
-        // Дешифрование данных с использованием IV из файла
+        // Расшифрование данных с использованием IV из файла
         resultData = decryptDataWithIV(fileData, key);
     }
 
